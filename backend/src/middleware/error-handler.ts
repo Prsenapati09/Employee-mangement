@@ -1,5 +1,4 @@
 import type { ErrorRequestHandler } from "express";
-import { env } from "../config/env";
 
 export const errorHandler: ErrorRequestHandler = (
   error,
@@ -19,7 +18,7 @@ export const errorHandler: ErrorRequestHandler = (
   }
 
   const message =
-    statusCode >= 500 && env.NODE_ENV === "production"
+    statusCode >= 500
       ? "Internal server error"
       : error instanceof Error
         ? error.message
