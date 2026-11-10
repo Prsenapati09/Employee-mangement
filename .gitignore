@@ -5,6 +5,8 @@ dist/
 coverage/
 *.tsbuildinfo
 *.log
+*.bak
+*.backup
 .env
 .env.*
 !.env.example

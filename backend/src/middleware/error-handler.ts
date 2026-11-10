@@ -14,7 +14,15 @@ export const errorHandler: ErrorRequestHandler = (
       : 500;
 
   if (statusCode >= 500) {
-    console.error(error);
+    const errorName = error instanceof Error ? error.name : "UnknownError";
+    const errorCode =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (typeof error.code === "string" || typeof error.code === "number")
+        ? error.code
+        : undefined;
+    console.error("Request failed.", { errorName, errorCode });
   }
 
   const message =

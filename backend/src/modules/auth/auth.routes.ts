@@ -1,19 +1,23 @@
 import { Router } from "express";
 import { env } from "../../config/env";
 import { requireAuthentication } from "./auth.middleware";
+import { authRateLimiter } from "../../middleware/auth-rate-limiter";
 import {
   AuthError,
+  acceptEmployeeInvitation,
   getCurrentProfile,
   isValidOwnerProvisioningSecret,
   login,
+  requestPasswordReset,
+  resetPassword,
   registerOrganizationOwner,
   revokeAccessToken,
 } from "./auth.service";
-import { loginSchema, ownerRegistrationSchema } from "./auth.validation";
+import { acceptInvitationSchema, forgotPasswordSchema, loginSchema, ownerRegistrationSchema, resetPasswordSchema } from "./auth.validation";
 
 const authRouter = Router();
 
-authRouter.post("/register-owner", async (request, response, next) => {
+authRouter.post("/register-owner", authRateLimiter, async (request, response, next) => {
   if (!env.OWNER_PROVISIONING_SECRET) {
     response.status(503).json({
       success: false,
@@ -52,7 +56,7 @@ authRouter.post("/register-owner", async (request, response, next) => {
   }
 });
 
-authRouter.post("/login", async (request, response, next) => {
+authRouter.post("/login", authRateLimiter, async (request, response, next) => {
   const input = loginSchema.safeParse(request.body);
   if (!input.success) {
     response.status(400).json({
@@ -120,4 +124,74 @@ authRouter.post(
   },
 );
 
+
+authRouter.post("/forgot-password", authRateLimiter, async (request, response, next) => {
+  const input = forgotPasswordSchema.safeParse(request.body);
+  if (!input.success) {
+    response.status(400).json({
+      success: false,
+      error: { message: "Invalid password recovery details." },
+    });
+    return;
+  }
+
+  try {
+    await requestPasswordReset(input.data);
+    response.status(200).json({
+      success: true,
+      data: { message: "If an account matches those details, a password reset email will be sent." },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/reset-password", authRateLimiter, async (request, response, next) => {
+  const input = resetPasswordSchema.safeParse(request.body);
+  if (!input.success) {
+    response.status(400).json({
+      success: false,
+      error: { message: "Invalid password reset details." },
+    });
+    return;
+  }
+
+  try {
+    await resetPassword(input.data);
+    response.status(200).json({
+      success: true,
+      data: { message: "Password reset successfully. Please sign in again." },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+authRouter.post("/accept-invitation", authRateLimiter, async (request, response, next) => {
+  const input = acceptInvitationSchema.safeParse(request.body);
+  if (!input.success) {
+    response.status(400).json({
+      success: false,
+      error: { message: "Invalid invitation details." },
+    });
+    return;
+  }
+
+  try {
+    await acceptEmployeeInvitation(input.data);
+    response.status(201).json({
+      success: true,
+      data: { message: "Employee account activated. You can now sign in." },
+    });
+  } catch (error) {
+    if (error instanceof AuthError) {
+      response.status(error.statusCode).json({
+        success: false,
+        error: { message: error.message },
+      });
+      return;
+    }
+    next(error);
+  }
+});
 export { authRouter };

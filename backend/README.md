@@ -1,6 +1,6 @@
 # Backend
 
-Versioned Express API written in TypeScript. The implemented operational endpoints are `GET /api/v1/health` and `GET /api/v1/health/ready`. Security headers, CORS, request logging, JSON 404 handling, centralized errors, and validated environment configuration are in place. Authentication, employee CRUD, and other business logic are not implemented.
+Versioned Express API written in TypeScript. It provides authentication and password recovery, owner provisioning, employee invitations, employee and department CRUD, team-scoped attendance and leave operations, user/organization settings, private employee documents, and MongoDB-backed HR reports. Security headers, origin-restricted CORS, privacy-safe request logging, JSON 404 handling, centralized errors, and validated environment configuration are enabled.
 
 Configure `MONGODB_URI` in `backend/.env` with the MongoDB Atlas SRV connection string targeting the `hrmpro` database. Non-test startup rejects local MongoDB URIs and connects to Atlas before listening; startup errors are sanitized. `GET /api/v1/health` remains an application liveness check; `/api/v1/health/ready` returns 200 only when MongoDB is connected and 503 otherwise. MongoDB credentials belong only in the ignored `.env` file, never in source control.
 
@@ -28,3 +28,23 @@ Non-test startup requires an Atlas `mongodb+srv` URI whose database path is `hrm
 - `POST /api/v1/auth/logout` revokes the presented access token.
 
 Passwords are stored as scrypt hashes. Access tokens expire after 15 minutes; only their SHA-256 hashes are stored. No refresh tokens are implemented. Keep the provisioning secret private and rotate it if exposed.
+
+## Roles and data access
+
+- Owners and admins can update organization names and manage account status. Neither can change their own status or change a user's role through these APIs; admins cannot manage owner/admin accounts.
+- HR manages employee records, departments, attendance, leave administration, and documents.
+- Managers must have a linked employee profile with a department. Employee, attendance, department, document, and leave reads are limited to that department; managers can review team leave requests but cannot change organization-wide records.
+- Employee accounts can access their linked employee profile, own attendance and leave requests, and own documents. They cannot enumerate or read another employee's private records.
+- Every business query is scoped to the authenticated organization. Role checks are enforced on the API and are not dependent on frontend navigation.
+
+## Invitations, reports, and documents
+
+Employee invitation links use random 256-bit secrets; only token hashes are persisted. Tokens expire after 24 hours, acceptance is transactional, duplicate accounts and cross-organization links are rejected, and an invitation is removed if delivery fails. Configure `SMTP_USER` and `SMTP_APP_PASSWORD` to send email. Without SMTP, email-dependent operations report delivery failure rather than pretending that a message was sent.
+
+`GET /api/v1/reports/summary` returns employee, department, attendance, leave approval, and joining-trend aggregates from MongoDB. Optional `from` and `to` query parameters use `YYYY-MM-DD`; report access is limited to owners, admins, and HR.
+
+Documents are uploaded as `application/octet-stream` to authenticated `/api/v1/documents/employees/:employeeId` endpoints with `X-Document-Filename`, `X-Document-Content-Type`, and `X-Document-Category` headers. The local adapter accepts PDF, PNG, JPEG, and plain text files up to 5 MB, verifies file signatures, stores generated filenames outside public assets, and serves downloads only after organization/employee authorization. Set `DOCUMENT_STORAGE_DIR` to a persistent private directory for local deployments. Replace `modules/documents/local-document-storage.ts` with a managed private-storage adapter before deploying multiple API instances or using ephemeral hosting.
+
+## Tests
+
+`npm test` runs MongoDB integration tests. Configure a reachable `MONGODB_URI`; the test suite creates and drops a uniquely named test database, so use a database account with permission to create and drop databases. Email delivery tests inject success/failure outcomes and do not verify external SMTP credentials.

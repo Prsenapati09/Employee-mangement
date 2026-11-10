@@ -16,6 +16,13 @@ const environmentSchema = z
       z.string().min(32).optional(),
     ),
     FRONTEND_URL: z.string().url().default("http://localhost:3000"),
+    DOCUMENT_STORAGE_DIR: z.preprocess(
+      (value) => (value === "" ? undefined : value),
+      z.string().min(1).optional(),
+    ),
+    SMTP_USER: z.string().email().optional().or(z.literal("")),
+    SMTP_APP_PASSWORD: z.string().optional().default(""),
+    CONTACT_NOTIFICATION_EMAIL: z.string().email().optional().or(z.literal("")),
   })
   .superRefine((configuration, context) => {
     if (configuration.NODE_ENV === "test") {

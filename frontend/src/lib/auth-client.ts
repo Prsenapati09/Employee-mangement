@@ -43,7 +43,7 @@ async function request(
   options: {
     method: "GET" | "POST";
     token?: string;
-    body?: LoginCredentials;
+    body?: object;
   },
 ): Promise<unknown> {
   const headers = new Headers();
@@ -154,5 +154,36 @@ export async function logout(accessToken: string): Promise<void> {
   await request("/auth/logout", {
     method: "POST",
     token: accessToken,
+  });
+}
+
+export async function forgotPassword(input: {
+  organizationSlug: string;
+  email: string;
+}): Promise<void> {
+  await request("/auth/forgot-password", {
+    method: "POST",
+    body: input,
+  });
+}
+
+export async function resetPassword(input: {
+  token: string;
+  password: string;
+}): Promise<void> {
+  await request("/auth/reset-password", {
+    method: "POST",
+    body: input,
+  });
+}
+
+
+export async function acceptInvitation(input: {
+  token: string;
+  password: string;
+}): Promise<void> {
+  await request("/auth/accept-invitation", {
+    method: "POST",
+    body: input,
   });
 }

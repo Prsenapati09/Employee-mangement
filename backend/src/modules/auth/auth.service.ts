@@ -4,7 +4,13 @@ import {
   scrypt as scryptCallback,
   timingSafeEqual,
 } from "node:crypto";
+import mongoose from "mongoose";
 import { AuthSession } from "./auth-session.model";
+import { Employee } from "../employees/employee.model";
+import { EmployeeInvitation } from "../employees/employee-invitation.model";
+import { PasswordReset } from "./password-reset.model";
+import { env } from "../../config/env";
+import { sendNotificationEmail } from "../notifications/email.service";
 import { Organization } from "../organization/organization.model";
 import { User } from "../users/user.model";
 import type { LoginInput, OwnerRegistrationInput } from "./auth.validation";
@@ -107,6 +113,7 @@ export interface AuthenticatedContext {
   sessionId: string;
   userId: string;
   organizationId: string;
+  role: "owner" | "admin" | "hr" | "manager" | "employee";
 }
 
 export async function registerOrganizationOwner(
@@ -237,7 +244,7 @@ export async function authenticateAccessToken(
       _id: session.userId,
       organizationId: session.organizationId,
       status: "active",
-    }).select("_id"),
+    }).select("_id role"),
     Organization.findOne({
       _id: session.organizationId,
       status: "active",
@@ -253,6 +260,7 @@ export async function authenticateAccessToken(
     sessionId: session._id.toString(),
     userId: user._id.toString(),
     organizationId: organization._id.toString(),
+    role: user.role,
   };
 }
 
@@ -311,4 +319,197 @@ export function isValidOwnerProvisioningSecret(
     provided.length === configured.length &&
     timingSafeEqual(provided, configured)
   );
+}
+
+export async function requestPasswordReset(input: {
+  organizationSlug: string;
+  email: string;
+}): Promise<void> {
+  const organization = await Organization.findOne({
+    slug: input.organizationSlug,
+    status: "active",
+  }).select("_id slug");
+
+  if (!organization) return;
+
+  const user = await User.findOne({
+    organizationId: organization._id,
+    email: input.email,
+    status: "active",
+  }).select("_id email");
+
+  if (!user) return;
+
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = hashAccessToken(token);
+  const expiresAt = new Date(Date.now() + 15 * 60 * 1000);
+
+  await PasswordReset.deleteMany({
+    userId: user._id,
+    organizationId: organization._id,
+  });
+
+  const reset = await PasswordReset.create({
+    userId: user._id,
+    organizationId: organization._id,
+    tokenHash,
+    expiresAt,
+  });
+
+  const resetUrl = new URL("/reset-password", env.FRONTEND_URL);
+  resetUrl.searchParams.set("token", token);
+
+  const sent = await sendNotificationEmail({
+    to: user.email,
+    subject: "Reset your HRMPro password",
+    text: [
+      "We received a request to reset your HRMPro password.",
+      "",
+      `Use this link within 15 minutes: ${resetUrl.toString()}`,
+      "",
+      "If you did not request this, you can ignore this email.",
+    ].join("\n"),
+  });
+
+  if (!sent) {
+    await PasswordReset.deleteOne({ _id: reset._id });
+  }
+}
+
+export async function resetPassword(input: {
+  token: string;
+  password: string;
+}): Promise<void> {
+  const tokenHash = hashAccessToken(input.token);
+  const now = new Date();
+
+  const reset = await PasswordReset.findOneAndUpdate(
+    {
+      tokenHash,
+      expiresAt: { $gt: now },
+      usedAt: null,
+    },
+    { $set: { usedAt: now } },
+    { new: true },
+  );
+
+  if (!reset) {
+    throw new AuthError("This password reset link is invalid or has expired.", 400);
+  }
+
+  const passwordHash = await hashPassword(input.password);
+  const update = await User.updateOne(
+    {
+      _id: reset.userId,
+      organizationId: reset.organizationId,
+      status: "active",
+    },
+    { $set: { passwordHash } },
+  );
+
+  if (update.modifiedCount !== 1) {
+    throw new AuthError("Unable to reset this password. Please request a new link.", 400);
+  }
+
+  await Promise.all([
+    AuthSession.deleteMany({
+      userId: reset.userId,
+      organizationId: reset.organizationId,
+    }),
+    PasswordReset.deleteMany({
+      userId: reset.userId,
+      organizationId: reset.organizationId,
+    }),
+  ]);
+}
+
+
+
+export async function acceptEmployeeInvitation(input: {
+  token: string;
+  password: string;
+}): Promise<void> {
+  if (!/^[A-Za-z0-9_-]{43}$/.test(input.token)) {
+    throw new AuthError("This invitation is invalid or has expired.", 400);
+  }
+
+  const tokenHash = hashAccessToken(input.token);
+  const passwordHash = await hashPassword(input.password);
+  const now = new Date();
+  const session = await mongoose.startSession();
+
+  try {
+    await session.withTransaction(async () => {
+      const invitation = await EmployeeInvitation.findOneAndUpdate(
+        {
+          tokenHash,
+          expiresAt: { $gt: now },
+          acceptedAt: null,
+        },
+        { $set: { acceptedAt: now } },
+        { new: true, session },
+      );
+
+      if (!invitation) {
+        throw new AuthError("This invitation is invalid or has expired.", 400);
+      }
+
+      const employee = await Employee.findOne({
+        _id: invitation.employeeId,
+        organizationId: invitation.organizationId,
+        email: invitation.email,
+        status: "active",
+        userId: { $exists: false },
+      }).session(session);
+
+      if (!employee) {
+        throw new AuthError(
+          "This employee invitation can no longer be accepted.",
+          409,
+        );
+      }
+
+      const existingUser = await User.findOne({
+        organizationId: invitation.organizationId,
+        email: invitation.email,
+      }).session(session);
+
+      if (existingUser) {
+        throw new AuthError(
+          "An account already exists for this employee email.",
+          409,
+        );
+      }
+
+      const [user] = await User.create(
+        [{
+          organizationId: invitation.organizationId,
+          email: invitation.email,
+          passwordHash,
+          role: "employee",
+          status: "active",
+        }],
+        { session },
+      );
+
+      const linked = await Employee.updateOne(
+        {
+          _id: employee._id,
+          organizationId: invitation.organizationId,
+          userId: { $exists: false },
+        },
+        { $set: { userId: user._id } },
+        { session },
+      );
+
+      if (linked.modifiedCount !== 1) {
+        throw new AuthError(
+          "Unable to link this employee account. Please try again.",
+          409,
+        );
+      }
+    });
+  } finally {
+    await session.endSession();
+  }
 }

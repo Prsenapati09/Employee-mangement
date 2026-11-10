@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="560" height="360" viewBox="0 0 560 360" fill="none">
+  <rect x="64" y="46" width="432" height="270" rx="28" fill="#ECFDF5"/>
+  <circle cx="433" cy="88" r="31" fill="#D1FAE5"/>
+  <circle cx="117" cy="101" r="13" fill="#A7F3D0"/>
+  <path d="M92 310c17-44 51-68 100-68s83 24 100 68" fill="#A7F3D0"/>
+  <path d="M115 315c8-39 33-61 77-61s69 22 77 61" fill="#047857"/>
+  <circle cx="192" cy="219" r="23" fill="#FDE68A"/>
+  <path d="M355 310c12-37 40-57 83-57s71 20 83 57" fill="#6EE7B7"/>
+  <path d="M379 313c7-32 26-49 59-49s52 17 59 49" fill="#065F46"/>
+  <circle cx="438" cy="244" r="19" fill="#FCD9B6"/>
+  <rect x="174" y="117" width="210" height="125" rx="13" fill="#fff" stroke="#D1E6DE" stroke-width="2"/>
+  <rect x="193" y="136" width="67" height="8" rx="4" fill="#CBD5E1"/>
+  <rect x="193" y="153" width="110" height="6" rx="3" fill="#E2E8F0"/>
+  <rect x="193" y="174" width="50" height="48" rx="8" fill="#ECFDF5"/>
+  <path d="M202 211v-11l9-8 9 5 11-14" stroke="#059669" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+  <circle cx="231" cy="183" r="3" fill="#059669"/>
+  <rect x="253" y="174" width="111" height="48" rx="8" fill="#F8FAFC"/>
+  <rect x="267" y="199" width="9" height="13" rx="3" fill="#A7F3D0"/>
+  <rect x="282" y="188" width="9" height="24" rx="3" fill="#6EE7B7"/>
+  <rect x="297" y="180" width="9" height="32" rx="3" fill="#34D399"/>
+  <rect x="312" y="191" width="9" height="21" rx="3" fill="#10B981"/>
+  <rect x="327" y="184" width="9" height="28" rx="3" fill="#047857"/>
+  <path d="M119 143c0-11 9-20 20-20s20 9 20 20v16h-40v-16Z" fill="#059669"/>
+  <circle cx="139" cy="117" r="12" fill="#FCD9B6"/>
+  <path d="M427 134c0-9 7-16 16-16s16 7 16 16v14h-32v-14Z" fill="#10B981"/>
+  <circle cx="443" cy="112" r="10" fill="#FDE6CE"/>
+  <path d="M65 316h430" stroke="#A7F3D0" stroke-linecap="round" stroke-width="4"/>
+  <path d="M132 278v36m0-26c-9-11-18-11-25 0m25-8c8-11 17-11 24 0" stroke="#047857" stroke-linecap="round" stroke-width="4"/>
+  <path d="M467 282v31m0-22c-7-9-14-9-20 0m20-7c7-9 14-9 20 0" stroke="#059669" stroke-linecap="round" stroke-width="4"/>
+  <path d="m370 69 4 9 10 1-7 7 2 10-9-5-9 5 2-10-7-7 10-1 4-9Z" fill="#FBBF24"/>
+</svg>
